@@ -1,0 +1,33 @@
+quarkus:
+  http:
+    port: 8082
+  transaction-manager:
+    default-transaction-timeout: 300
+  datasource:
+    # Eliminamos el nivel "web:" para que sea el datasource por defecto
+    db-kind: mysql
+    username: u625751521_6t0qa
+    password: f0syp2oJMd
+    jdbc:
+      url: jdbc:mysql://srv2021.hstgr.io:3306/u625751521_3kWBa
+      additional-jdbc-properties:
+        connectTimeout: 30000
+        socketTimeout: 60000
+
+  hibernate-orm:
+    dialect: org.hibernate.dialect.MySQLDialect
+    database:
+      generation: none
+    validation:
+      enabled: false
+    log:
+      sql: false
+    packages: com.blessrom.transform.data.dto
+
+weaviate:
+  host: "localhost:8081"
+  scheme: "http"
+  api-key-openai: ${OPENAI_API_KEY}
+
+sincronizador:
+  batch-size: 50
