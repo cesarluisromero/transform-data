@@ -54,20 +54,64 @@ public class SincronizadorService {
         LOG.info("🚀 Cliente Weaviate configurado exitosamente para Blessrom (Modo Incremental).");
     }
 
-    @Scheduled(every = "6h")
-    public void sincronizar() {
-        if (client == null) return;
-
-        LOG.info("🔄 Iniciando sincronización inteligente de productos...");
-
-        // SQL: Traemos datos filtrando por stock y usando COALESCE para evitar nulos
+    public List<ProductoDTO> obtenerTodos() {
+        LOG.info("🔍 Ejecutando SQL para obtener todos los productos...");
+        
         String sql = "SELECT p.ID, p.post_title, p.post_content, " +
                 "COALESCE(pm_price.meta_value, '0') as precio, " +
                 "COALESCE(pm_stock.meta_value, '0') as stock, " +
-                "p.post_modified " +
+                "p.post_modified, p.post_parent, p.post_type, " +
+                "p_img.guid as img_url " +
                 "FROM wp_posts p " +
                 "LEFT JOIN wp_postmeta pm_stock ON p.ID = pm_stock.post_id AND pm_stock.meta_key = '_stock' " +
                 "LEFT JOIN wp_postmeta pm_price ON p.ID = pm_price.post_id AND pm_price.meta_key = '_price' " +
+                "LEFT JOIN wp_postmeta pm_thumb ON p.ID = pm_thumb.post_id AND pm_thumb.meta_key = '_thumbnail_id' " +
+                "LEFT JOIN wp_posts p_img ON pm_thumb.meta_value = p_img.ID " +
+                "WHERE p.post_type IN ('product', 'product_variation') " +
+                "AND p.post_status = 'publish' " +
+                "AND CAST(COALESCE(pm_stock.meta_value, '0') AS UNSIGNED) > 0";
+
+        try {
+            List<Object[]> resultados = emWeb.createNativeQuery(sql).getResultList();
+            LOG.info("📊 Productos encontrados en MySQL: " + resultados.size());
+            
+            return resultados.stream().map(r -> {
+                String id = r[0].toString();
+                String title = r[1] != null ? r[1].toString() : "Sin nombre";
+                String content = r[2] != null ? r[2].toString() : "";
+                double price = Double.parseDouble(r[3] != null ? r[3].toString() : "0");
+                int stock = Integer.parseInt(r[4].toString());
+                String modified = r[5] != null ? r[5].toString() : "";
+                String postParent = r[6] != null ? r[6].toString() : "0";
+                String postType = r[7] != null ? r[7].toString() : "product";
+                String imgUrl = r[8] != null ? r[8].toString() : "";
+                
+                String finalId = ("product_variation".equals(postType) && !"0".equals(postParent)) ? postParent : id;
+
+                return new ProductoDTO(finalId, title, content, price, stock, modified, imgUrl);
+            }).collect(Collectors.toList());
+            
+        } catch (Exception e) {
+            LOG.error("❌ ERROR CRÍTICO al obtener productos: " + e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    @Scheduled(every = "6h")
+    public void sincronizar() {
+        if (client == null) return;
+        LOG.info("🔄 Iniciando sincronización inteligente de productos...");
+
+        String sql = "SELECT p.ID, p.post_title, p.post_content, " +
+                "COALESCE(pm_price.meta_value, '0') as precio, " +
+                "COALESCE(pm_stock.meta_value, '0') as stock, " +
+                "p.post_modified, p.post_parent, p.post_type, " +
+                "p_img.guid as img_url " +
+                "FROM wp_posts p " +
+                "LEFT JOIN wp_postmeta pm_stock ON p.ID = pm_stock.post_id AND pm_stock.meta_key = '_stock' " +
+                "LEFT JOIN wp_postmeta pm_price ON p.ID = pm_price.post_id AND pm_price.meta_key = '_price' " +
+                "LEFT JOIN wp_postmeta pm_thumb ON p.ID = pm_thumb.post_id AND pm_thumb.meta_key = '_thumbnail_id' " +
+                "LEFT JOIN wp_posts p_img ON pm_thumb.meta_value = p_img.ID " +
                 "WHERE p.post_type IN ('product', 'product_variation') " +
                 "AND p.post_status = 'publish' " +
                 "AND CAST(COALESCE(pm_stock.meta_value, '0') AS UNSIGNED) > 0";
@@ -80,23 +124,28 @@ public class SincronizadorService {
             int saltados = 0;
 
             for (Object[] r : resultados) {
-                // 1. Validación de seguridad contra nulos en la fila
                 if (r[0] == null || r[4] == null) continue;
 
+                String id = r[0].toString();
+                String postParent = r[6] != null ? r[6].toString() : "0";
+                String postType = r[7] != null ? r[7].toString() : "product";
+                String imgUrl = r[8] != null ? r[8].toString() : "";
+                String finalId = ("product_variation".equals(postType) && !"0".equals(postParent)) ? postParent : id;
+
                 ProductoDTO prod = new ProductoDTO(
-                        r[0].toString(),
+                        finalId,
                         r[1] != null ? r[1].toString() : "Sin nombre",
                         r[2] != null ? r[2].toString() : "",
                         Double.parseDouble(r[3] != null ? r[3].toString() : "0"),
                         Integer.parseInt(r[4].toString()),
-                        r[5] != null ? r[5].toString() : ""
+                        r[5] != null ? r[5].toString() : "",
+                        imgUrl
                 );
 
-                String uuid = generarUUID(prod.id());
+                String uuid = generarUUID(id);
                 boolean necesitaActualizar = true;
                 boolean existeEnWeaviate = false;
 
-                // 2. Comprobar si ya existe en Weaviate para comparar fechas
                 var existente = client.data().objectsGetter()
                         .withID(uuid)
                         .withClassName("Producto")
@@ -112,7 +161,6 @@ public class SincronizadorService {
                     }
                 }
 
-                // 3. Crear o Actualizar (Upsert)
                 if (necesitaActualizar) {
                     Map<String, Object> props = new HashMap<>();
                     props.put("nombre", prod.nombre());

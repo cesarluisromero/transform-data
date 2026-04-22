@@ -9,9 +9,9 @@ quarkus:
     username: u625751521_6t0qa
     password: f0syp2oJMd
     jdbc:
-      url: jdbc:mysql://srv2021.hstgr.io:3306/u625751521_3kWBa
+      url: jdbc:mysql://srv2021.hstgr.io:3306/u625751521_3kWBa?useSSL=false&allowPublicKeyRetrieval=true
       additional-jdbc-properties:
-        connectTimeout: 30000
+        connectTimeout: 60000
         socketTimeout: 60000
 
   hibernate-orm:

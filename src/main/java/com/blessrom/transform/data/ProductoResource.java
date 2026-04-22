@@ -7,6 +7,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
+import java.util.List;
+import com.blessrom.transform.data.dto.ProductoDTO;
+
 @Path("/api/v1/productos")
 public class ProductoResource {
 
@@ -22,5 +25,12 @@ public class ProductoResource {
         }
         // Llama a tu motor de Weaviate que ya configuramos
         return sincronizador.buscar(consulta);
+    }
+
+    @GET
+    @Path("/todos")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<ProductoDTO> obtenerTodos() {
+        return sincronizador.obtenerTodos();
     }
 }
