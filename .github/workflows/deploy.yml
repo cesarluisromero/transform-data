@@ -43,9 +43,9 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          source: "target/quarkus-app/"
+          source: "target/quarkus-app/*"
           target: "/opt/blessrom-sync/target/quarkus-app/"
-          strip_components: 1
+          strip_components: 2
 
       - name: Start Service on VPS
         uses: appleboy/ssh-action@v1.0.3
