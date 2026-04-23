@@ -10,7 +10,8 @@ public record ProductoDTO(
         String descripcionOriginal,
         Double precio,
         Integer stock,
-        String fechaModificacion // <-- ¡Este campo es vital para comparar!
+        String fechaModificacion,
+        String imageUrl // <-- Nuevo campo para la miniatura
 ) {
     public String descripcionLimpia() {
         if (descripcionOriginal == null) return "";
